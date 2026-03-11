@@ -213,8 +213,21 @@ class SettingsScreen(QWidget):
     def preview_profile(self, profile_name: str):
         cfg = self.tag_manager.connections.get(profile_name, {})
         self.lbl_driver.setText(str(cfg.get("driver", "")))
-        self.lbl_host.setText(str(cfg.get("host", "")))
-        self.lbl_port.setText(str(cfg.get("port", "")))
+        
+        endpoint = str(cfg.get("endpoint", "")).strip()
+        host_value = endpoint or str(cfg.get("host", ""))
+        self.lbl_host.setText(host_value)
+
+        port_value = cfg.get("port", "")
+        if not port_value and endpoint.startswith("opc.tcp://"):
+            try:
+                host_port = endpoint.split("://", 1)[1].split("/", 1)[0]
+                if ":" in host_port:
+                    port_value = host_port.rsplit(":", 1)[1]
+            except Exception:
+                port_value = ""
+
+        self.lbl_port.setText(str(port_value))
         self.lbl_poll.setText(str(cfg.get("poll_ms", "")))
 
     def apply_profile(self):
@@ -317,12 +330,30 @@ class SettingsScreen(QWidget):
                     raise ValueError(f"Duplicate profile name: {name}")
 
                 driver = self._combo_value(self.tbl_profiles, row, 1, "simulator")
-                profiles[name] = {
+                previous_cfg = dict(self.tag_manager.connections.get(name, {}))
+                host_text = self._table_text(self.tbl_profiles, row, 2)
+                port_value = self._safe_int(self._table_text(self.tbl_profiles, row, 3), 0)
+                poll_ms = self._safe_int(self._table_text(self.tbl_profiles, row, 4), 250)
+
+                profile_cfg = dict(previous_cfg)
+                profile_cfg.update({
                     "driver": driver,
-                    "host": self._table_text(self.tbl_profiles, row, 2),
-                    "port": self._safe_int(self._table_text(self.tbl_profiles, row, 3), 0),
-                    "poll_ms": self._safe_int(self._table_text(self.tbl_profiles, row, 4), 250),
-                }
+                    "host": host_text,
+                    "port": port_value,
+                    "poll_ms": poll_ms,
+                })
+
+                if driver == "opcua":
+                    endpoint = str(previous_cfg.get("endpoint", "")).strip()
+                    if host_text.lower().startswith("opc.tcp://"):
+                        endpoint = host_text
+                    elif host_text:
+                        effective_port = port_value or 4840
+                        endpoint = f"opc.tcp://{host_text}:{effective_port}"
+                    if endpoint:
+                        profile_cfg["endpoint"] = endpoint
+
+                profiles[name] = profile_cfg
 
             self.tag_manager.connections = profiles
             if self.tag_manager.active_connection_name not in profiles and profiles:

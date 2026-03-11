@@ -1,4 +1,6 @@
+import logging
 from typing import Any, List
+
 from asyncua.sync import Client
 
 from hmi.drivers.base_driver import BasePlcDriver
@@ -7,6 +9,7 @@ from hmi.models.tag_models import TagDefinition
 
 class OpcUaDriver(BasePlcDriver):
     def __init__(self, endpoint: str, username: str = "", password: str = ""):
+        self.logger = logging.getLogger(__name__)
         self.endpoint = endpoint
         self.username = username
         self.password = password
@@ -19,8 +22,14 @@ class OpcUaDriver(BasePlcDriver):
             self.client.set_password(self.password)
 
     def connect(self) -> bool:
+        self.logger.info(
+            "OPC UA connect endpoint=%s username_set=%s",
+            self.endpoint,
+            bool(self.username),
+        )
         self.client.connect()
         self._connected = True
+        self.logger.info("OPC UA session established")
         return True
 
     def disconnect(self) -> None:

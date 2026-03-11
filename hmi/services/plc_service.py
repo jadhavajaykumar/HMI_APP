@@ -1,3 +1,5 @@
+import logging
+
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from hmi.drivers.modbus_driver import ModbusDriver
@@ -13,6 +15,7 @@ class PlcService(QObject):
 
     def __init__(self, tag_manager: TagManager):
         super().__init__()
+        self.logger = logging.getLogger(__name__)
         self.tag_manager = tag_manager
         self.driver = self._build_driver()
         self.timer = QTimer()
@@ -22,6 +25,11 @@ class PlcService(QObject):
     def _build_driver(self):
         cfg = self.tag_manager.connection_config
         driver_name = str(cfg.get("driver", "simulator")).lower()
+        self.logger.info(
+            "Building PLC driver for profile='%s' driver='%s'",
+            self.tag_manager.get_active_connection_name(),
+            driver_name,
+        )
 
         if driver_name == "modbus":
             return ModbusDriver(
@@ -59,10 +67,10 @@ class PlcService(QObject):
             endpoint = cfg.get("endpoint", "")
             if not endpoint:
                 # backward-friendly fallback if user filled host/port instead of endpoint
-                host = cfg.get("host", "")
+                host = str(cfg.get("host", "")).strip()
                 port = cfg.get("port", 4840)
                 if host:
-                    endpoint = f"opc.tcp://{host}:{port}"
+                    endpoint = host if host.lower().startswith("opc.tcp://") else f"opc.tcp://{host}:{port}"
 
             if not endpoint:
                 raise ValueError(
@@ -88,8 +96,14 @@ class PlcService(QObject):
             ok = self.driver.connect()
             self.connection_changed.emit(ok)
             if ok:
+                self.logger.info(
+                    "PLC connected profile='%s' poll_ms=%s",
+                    self.tag_manager.get_active_connection_name(),
+                    self.poll_ms,
+                )
                 self.timer.start(self.poll_ms)
         except Exception as exc:
+            self.logger.exception("PLC start/connect failed")
             self.error_occurred.emit(str(exc))
             self.connection_changed.emit(False)
 
@@ -134,6 +148,7 @@ class PlcService(QObject):
                     self.tag_changed.emit(tag_name, value)
 
         except Exception as exc:
+            self.logger.exception("PLC poll failed")
             self.error_occurred.emit(str(exc))
             self.connection_changed.emit(False)
 
@@ -149,6 +164,7 @@ class PlcService(QObject):
                 self.tag_changed.emit(tag_name, value)
             return ok
         except Exception as exc:
+            self.logger.exception("PLC write failed for tag='%s'", tag_name)
             self.error_occurred.emit(str(exc))
             return False
 
