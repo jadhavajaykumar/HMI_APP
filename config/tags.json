@@ -9,7 +9,7 @@
     },
     "keyence_modbus": {
       "driver": "modbus",
-      "host": "192.168.0.10",
+      "host": "192.168.3.102",
       "port": 502,
       "slave_id": 1,
       "poll_ms": 250
@@ -22,14 +22,17 @@
         "rack": 0,
         "slot": 1,
         "db_number": 100
-      }
+      },
+      "port": 0
     },
     "siemens_opcua_line1": {
       "driver": "opcua",
-      "endpoint": "opc.tcp://192.168.0.30:4840",
+      "endpoint": "opc.tcp://192.168.3.102:4840",
       "username": "",
       "password": "",
-      "poll_ms": 500
+      "poll_ms": 500,
+      "host": "192.168.3.102",
+      "port": 4840
     }
   },
   "tag_catalog": [
@@ -239,6 +242,48 @@
       "Command.ManStepMtr1Reverse": {
         "area": "opcua_node",
         "address": "ns=3;s=\"HMI_DB\".\"ManStepMtr1Reverse\""
+      }
+    },
+    "simulator_local": {
+      "Machine.RunStatus": {
+        "area": "",
+        "address": ""
+      },
+      "Machine.FaultCode": {
+        "area": "",
+        "address": ""
+      },
+      "Counters.GoodCount": {
+        "area": "",
+        "address": ""
+      },
+      "Recipe.TargetQty": {
+        "area": "",
+        "address": ""
+      },
+      "Input.DoorClosed": {
+        "area": "",
+        "address": ""
+      },
+      "Command.Start": {
+        "area": "",
+        "address": ""
+      },
+      "Command.Stop": {
+        "area": "",
+        "address": ""
+      },
+      "Command.Reset": {
+        "area": "",
+        "address": ""
+      },
+      "Command.ManStepMtrForward": {
+        "area": "",
+        "address": ""
+      },
+      "Command.ManStepMtr1Reverse": {
+        "area": "",
+        "address": ""
       }
     }
   },

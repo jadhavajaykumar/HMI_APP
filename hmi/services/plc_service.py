@@ -82,6 +82,7 @@ class PlcService(QObject):
                 endpoint=endpoint,
                 username=cfg.get("username", ""),
                 password=cfg.get("password", ""),
+                security_string=cfg.get("security_string", ""),
             )
 
         return SimulatorDriver(

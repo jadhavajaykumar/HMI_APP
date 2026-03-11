@@ -8,13 +8,23 @@ from hmi.models.tag_models import TagDefinition
 
 
 class OpcUaDriver(BasePlcDriver):
-    def __init__(self, endpoint: str, username: str = "", password: str = ""):
+    def __init__(
+        self,
+        endpoint: str,
+        username: str = "",
+        password: str = "",
+        security_string: str = "",
+    ):
         self.logger = logging.getLogger(__name__)
         self.endpoint = endpoint
         self.username = username
         self.password = password
+        self.security_string = security_string
         self.client = Client(self.endpoint)
         self._connected = False
+        
+        if self.security_string:
+            self.client.set_security_string(self.security_string)
 
         if self.username:
             self.client.set_user(self.username)
@@ -23,14 +33,23 @@ class OpcUaDriver(BasePlcDriver):
 
     def connect(self) -> bool:
         self.logger.info(
-            "OPC UA connect endpoint=%s username_set=%s",
+            "OPC UA connect endpoint=%s username_set=%s security_set=%s",
             self.endpoint,
             bool(self.username),
+            bool(self.security_string),
         )
-        self.client.connect()
-        self._connected = True
-        self.logger.info("OPC UA session established")
-        return True
+        try:
+            self.client.connect()
+            self._connected = True
+            self.logger.info("OPC UA session established")
+            return True
+        except Exception:
+            self.logger.exception(
+                "OPC UA connection failed endpoint=%s security_set=%s",
+                self.endpoint,
+                bool(self.security_string),
+            )
+            raise
 
     def disconnect(self) -> None:
         if self._connected:
@@ -48,8 +67,12 @@ class OpcUaDriver(BasePlcDriver):
                 continue
 
             node_id = str(tag.address)
-            node = self.client.get_node(node_id)
-            out[tag.name] = node.read_value()
+            try:
+                node = self.client.get_node(node_id)
+                out[tag.name] = node.read_value()
+            except Exception:
+                self.logger.exception("OPC UA read failed tag='%s' node='%s'", tag.name, node_id)
+                raise
         return out
 
     def write_tag(self, tag: TagDefinition, value: Any) -> bool:
@@ -57,6 +80,10 @@ class OpcUaDriver(BasePlcDriver):
             raise ValueError(f"Unsupported OPC UA area: {tag.area}")
 
         node_id = str(tag.address)
-        node = self.client.get_node(node_id)
-        node.write_value(value)
+        try:
+            node = self.client.get_node(node_id)
+            node.write_value(value)
+        except Exception:
+            self.logger.exception("OPC UA write failed tag='%s' node='%s'", tag.name, node_id)
+            raise
         return True
