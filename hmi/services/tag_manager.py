@@ -37,8 +37,14 @@ class TagManager:
         self.manual_devices = self.raw_data.get("manual_devices", [])
         self.alarm_words = self.raw_data.get("alarm_words", [])
 
-        self.tag_catalog = self.raw_data.get("tag_catalog", [])
+        # Prefer split architecture (tag_catalog + tag_bindings) while staying
+        # backward compatible with older flat-tag configs.
+        self.tag_catalog = self.raw_data.get("tag_catalog")
+        if self.tag_catalog is None:
+            self.tag_catalog = self.raw_data.get("tags", [])
+            
         self.tag_bindings = self.raw_data.get("tag_bindings", {})
+        self.ensure_binding_matrix()
 
         active_binding = self.tag_bindings.get(self.active_connection_name, {})
 
@@ -71,6 +77,7 @@ class TagManager:
         self._load()
 
     def save(self) -> None:
+        self.ensure_binding_matrix()
         self.raw_data["active_connection"] = self.active_connection_name
         self.raw_data["connections"] = self.connections
         self.raw_data["manual_devices"] = self.manual_devices
@@ -100,15 +107,15 @@ class TagManager:
             raise ValueError("Imported config is missing 'connections'.")
         if "tag_catalog" not in config_data:
             raise ValueError("Imported config is missing 'tag_catalog'.")
-        if "tag_bindings" not in config_data:
-            raise ValueError("Imported config is missing 'tag_bindings'.")
+        if "tag_bindings" not in config_data and "tags" not in config_data:
+            raise ValueError("Imported config is missing 'tag_bindings' (or legacy 'tags').")
 
         self.raw_data = {
             "active_connection": config_data.get("active_connection", ""),
             "connections": config_data.get("connections", {}),
             "manual_devices": config_data.get("manual_devices", []),
             "alarm_words": config_data.get("alarm_words", []),
-            "tag_catalog": config_data.get("tag_catalog", []),
+            "tag_catalog": config_data.get("tag_catalog", config_data.get("tags", [])),
             "tag_bindings": config_data.get("tag_bindings", {}),
         }
 
@@ -191,6 +198,8 @@ class TagManager:
                 if tag_name in valid_names
             }
 
+        self.ensure_binding_matrix()
+        
         self.raw_data["tag_catalog"] = self.tag_catalog
         self.raw_data["tag_bindings"] = self.tag_bindings
         self._load()
@@ -240,3 +249,61 @@ class TagManager:
 
     def get_tag_bindings(self):
         return self.tag_bindings
+
+    # ---------- binding helpers ----------
+
+    def ensure_binding_matrix(self):
+        if not isinstance(self.tag_bindings, dict):
+            self.tag_bindings = {}
+
+        tag_names = [
+            str(tag.get("name", "")).strip()
+            for tag in self.tag_catalog
+            if isinstance(tag, dict) and str(tag.get("name", "")).strip()
+        ]
+
+        for profile_name in self.connections.keys():
+            profile_bindings = self.tag_bindings.get(profile_name, {})
+            if not isinstance(profile_bindings, dict):
+                profile_bindings = {}
+
+            # prune deleted tags
+            profile_bindings = {
+                tag_name: binding
+                for tag_name, binding in profile_bindings.items()
+                if tag_name in tag_names
+            }
+
+            # create missing binding rows
+            for tag_name in tag_names:
+                profile_bindings.setdefault(tag_name, {"area": "", "address": ""})
+
+            self.tag_bindings[profile_name] = profile_bindings
+
+        # drop bindings for profiles that no longer exist
+        self.tag_bindings = {
+            profile_name: bindings
+            for profile_name, bindings in self.tag_bindings.items()
+            if profile_name in self.connections
+        }
+
+    def get_bindings_for_profile(self, profile_name: str) -> dict:
+        self.ensure_binding_matrix()
+        return dict(self.tag_bindings.get(profile_name, {}))
+
+    def set_bindings_for_profile(self, profile_name: str, bindings: dict):
+        if profile_name not in self.connections:
+            raise KeyError(f"Connection profile not found: {profile_name}")
+
+        self.ensure_binding_matrix()
+        clean = {}
+        for tag in self.tag_catalog:
+            tag_name = str(tag.get("name", "")).strip()
+            if not tag_name:
+                continue
+            b = bindings.get(tag_name, {}) if isinstance(bindings, dict) else {}
+            clean[tag_name] = {
+                "area": str(b.get("area", "")).strip(),
+                "address": b.get("address", ""),
+            }
+        self.tag_bindings[profile_name] = clean

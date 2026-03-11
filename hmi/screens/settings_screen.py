@@ -27,7 +27,7 @@ class SettingsScreen(QWidget):
 
     DRIVER_OPTIONS = ["simulator", "modbus", "siemens_s7", "opcua"]
     TAG_GROUP_OPTIONS = ["status", "manual", "command", "recipe", "io", "alarm", "system"]
-    TAG_AREA_OPTIONS = ["coil", "holding_register", "input_register", "discrete_input", "dbw", "dbx"]
+    TAG_AREA_OPTIONS = ["", "coil", "holding_register", "input_register", "discrete_input", "dbw", "dbx", "opcua_node"]
     TAG_TYPE_OPTIONS = ["bool", "uint16", "int16", "uint32", "int32", "float", "string"]
     TAG_ACCESS_OPTIONS = ["r", "w", "rw"]
     ALARM_SEVERITY_OPTIONS = ["critical", "warning", "info"]
@@ -74,19 +74,22 @@ class SettingsScreen(QWidget):
 
         if self.engineering_mode and self.is_admin:
             self.profiles_tab = QWidget()
-            self.tags_tab = QWidget()
+            self.tag_catalog_tab = QWidget()
+            self.tag_binding_tab = QWidget()
             self.alarms_tab = QWidget()
             self.manual_tab = QWidget()
             self.help_tab = QWidget()
 
             self.tabs.addTab(self.profiles_tab, "Profiles")
-            self.tabs.addTab(self.tags_tab, "Tags")
+            self.tabs.addTab(self.tag_catalog_tab, "Tag Catalog")
+            self.tabs.addTab(self.tag_binding_tab, "Tag Binding")
             self.tabs.addTab(self.alarms_tab, "Alarm Mapping")
             self.tabs.addTab(self.manual_tab, "Manual Devices")
             self.tabs.addTab(self.help_tab, "Help")
 
             self._build_profiles_tab()
-            self._build_tags_tab()
+            self._build_tag_catalog_tab()
+            self._build_tag_binding_tab()
             self._build_alarms_tab()
             self._build_manual_tab()
             self._build_help_tab()
@@ -324,8 +327,10 @@ class SettingsScreen(QWidget):
             self.tag_manager.connections = profiles
             if self.tag_manager.active_connection_name not in profiles and profiles:
                 self.tag_manager.active_connection_name = next(iter(profiles.keys()))
+            self.tag_manager.ensure_binding_matrix()    
             self.tag_manager.save()
             self.refresh_runtime_profile_list()
+            self.refresh_binding_profile_list()
             self.config_saved.emit("profiles")
             QMessageBox.information(self, "Saved", "Profiles saved successfully.")
         except Exception as exc:
@@ -340,17 +345,27 @@ class SettingsScreen(QWidget):
         self.cmb_profile.blockSignals(False)
         self.preview_profile(self.cmb_profile.currentText())
 
-    # ---------------- Tags ----------------
+    def refresh_binding_profile_list(self):
+        if not hasattr(self, "cmb_binding_profile"):
+            return
+        names = self.tag_manager.get_connection_names()
+        current = self.tag_manager.get_active_connection_name()
+        self.cmb_binding_profile.blockSignals(True)
+        self.cmb_binding_profile.clear()
+        self.cmb_binding_profile.addItems(names)
+        self.cmb_binding_profile.setCurrentText(current)
+        self.cmb_binding_profile.blockSignals(False)
+        self.load_tag_binding_table(current)
 
-    def _build_tags_tab(self):
-        layout = QVBoxLayout(self.tags_tab)
+    # ---------------- Tag Catalog ----------------
+
+    def _build_tag_catalog_tab(self):
+        layout = QVBoxLayout(self.tag_catalog_tab)
 
         hint = QLabel(
-            "Tag fields:\n"
+            "Tag Catalog fields:\n"
             "- Name: logical tag used by app screens.\n"
             "- Group: functional grouping like manual/status/alarm.\n"
-            "- Area: PLC memory area such as coil or holding_register.\n"
-            "- Address: PLC address/offset.\n"
             "- Data Type: bool, uint16, int16, float, etc.\n"
             "- Access: r / w / rw.\n"
             "- Default: fallback/startup value.\n"
@@ -360,16 +375,16 @@ class SettingsScreen(QWidget):
         hint.setObjectName("SubtleText")
         layout.addWidget(hint)
 
-        self.tbl_tags = QTableWidget(0, 8)
+        self.tbl_tags = QTableWidget(0, 6)
         self.tbl_tags.setHorizontalHeaderLabels(
-            ["Name", "Group", "Area", "Address", "Data Type", "Access", "Default", "Scale"]
+            ["Name", "Group", "Data Type", "Access", "Default", "Scale"]
         )
         layout.addWidget(self.tbl_tags)
 
         btn_row = QHBoxLayout()
         self.btn_tag_add = QPushButton("Add Tag")
         self.btn_tag_delete = QPushButton("Delete Selected")
-        self.btn_tag_save = QPushButton("Save Tags")
+        self.btn_tag_save = QPushButton("Save Tag Catalog")
         self.btn_tag_save.setObjectName("PrimaryButton")
         btn_row.addWidget(self.btn_tag_add)
         btn_row.addWidget(self.btn_tag_delete)
@@ -379,18 +394,18 @@ class SettingsScreen(QWidget):
 
         self.btn_tag_add.clicked.connect(self.add_tag_row)
         self.btn_tag_delete.clicked.connect(self.delete_selected_tag_row)
-        self.btn_tag_save.clicked.connect(self.save_tags_tab)
+        self.btn_tag_save.clicked.connect(self.save_tag_catalog_tab)
 
-        self.load_tags_table()
+        self.load_tag_catalog_table()
         self._apply_engineering_lock([self.btn_tag_add, self.btn_tag_delete, self.btn_tag_save, self.tbl_tags])
 
-    def load_tags_table(self):
+    def load_tag_catalog_table(self):
         self.tbl_tags.setRowCount(0)
         tags = self.tag_manager.get_all_tag_dicts()
         for tag in tags:
-            self._insert_tag_row(tag)
+            self._insert_tag_catalog_row(tag)
 
-    def _insert_tag_row(self, tag=None):
+    def _insert_tag_catalog_row(self, tag=None):
         tag = tag or {}
         row = self.tbl_tags.rowCount()
         self.tbl_tags.insertRow(row)
@@ -403,37 +418,29 @@ class SettingsScreen(QWidget):
         cmb_group.setCurrentText(str(tag.get("group", "status")))
         self.tbl_tags.setCellWidget(row, 1, cmb_group)
 
-        cmb_area = QComboBox()
-        cmb_area.setEditable(True)
-        cmb_area.addItems(self.TAG_AREA_OPTIONS)
-        cmb_area.setCurrentText(str(tag.get("area", "coil")))
-        self.tbl_tags.setCellWidget(row, 2, cmb_area)
-
-        self.tbl_tags.setItem(row, 3, QTableWidgetItem(str(tag.get("address", ""))))
-
         cmb_type = QComboBox()
         cmb_type.setEditable(True)
         cmb_type.addItems(self.TAG_TYPE_OPTIONS)
         cmb_type.setCurrentText(str(tag.get("data_type", "bool")))
-        self.tbl_tags.setCellWidget(row, 4, cmb_type)
+        self.tbl_tags.setCellWidget(row, 2, cmb_type)
 
         cmb_access = QComboBox()
         cmb_access.addItems(self.TAG_ACCESS_OPTIONS)
         cmb_access.setCurrentText(str(tag.get("access", "r")))
-        self.tbl_tags.setCellWidget(row, 5, cmb_access)
+        self.tbl_tags.setCellWidget(row, 3, cmb_access)
 
-        self.tbl_tags.setItem(row, 6, QTableWidgetItem(str(tag.get("default", ""))))
-        self.tbl_tags.setItem(row, 7, QTableWidgetItem(str(tag.get("scale", 1.0))))
+        self.tbl_tags.setItem(row, 4, QTableWidgetItem(str(tag.get("default", ""))))
+        self.tbl_tags.setItem(row, 5, QTableWidgetItem(str(tag.get("scale", 1.0))))
 
     def add_tag_row(self):
-        self._insert_tag_row()
+        self._insert_tag_catalog_row()
 
     def delete_selected_tag_row(self):
         row = self.tbl_tags.currentRow()
         if row >= 0:
             self.tbl_tags.removeRow(row)
 
-    def save_tags_tab(self):
+    def save_tag_catalog_tab(self):
         if not self.engineering_edit_allowed:
             QMessageBox.warning(self, "Locked", "Engineering edits are disabled.")
             return
@@ -453,12 +460,10 @@ class SettingsScreen(QWidget):
                 tag_dicts.append({
                     "name": name,
                     "group": self._combo_value(self.tbl_tags, row, 1, "status"),
-                    "area": self._combo_value(self.tbl_tags, row, 2, "coil"),
-                    "address": self._safe_int(self._table_text(self.tbl_tags, row, 3), 0),
-                    "data_type": self._combo_value(self.tbl_tags, row, 4, "bool"),
-                    "access": self._combo_value(self.tbl_tags, row, 5, "r"),
-                    "default": self._parse_default(self._table_text(self.tbl_tags, row, 6)),
-                    "scale": self._safe_float(self._table_text(self.tbl_tags, row, 7), 1.0),
+                    "data_type": self._combo_value(self.tbl_tags, row, 2, "bool"),
+                    "access": self._combo_value(self.tbl_tags, row, 3, "r"),
+                    "default": self._parse_default(self._table_text(self.tbl_tags, row, 4)),
+                    "scale": self._safe_float(self._table_text(self.tbl_tags, row, 5), 1.0),
                 })
 
             name_set = {t["name"] for t in tag_dicts}
@@ -467,8 +472,95 @@ class SettingsScreen(QWidget):
 
             self.tag_manager.replace_all_tags_from_dicts(tag_dicts)
             self.tag_manager.save()
+            self.load_tag_binding_table()
             self.config_saved.emit("tags")
-            QMessageBox.information(self, "Saved", "Tags saved successfully.")
+            QMessageBox.information(self, "Saved", "Tag catalog saved successfully.")
+        except Exception as exc:
+            QMessageBox.critical(self, "Save Error", str(exc))
+
+    # ---------------- Tag Binding ----------------
+
+    def _build_tag_binding_tab(self):
+        layout = QVBoxLayout(self.tag_binding_tab)
+
+        hint = QLabel(
+            "Tag Binding fields (for selected profile):\n"
+            "- Tag: logical name from catalog.\n"
+            "- Area: driver-specific memory area / node type.\n"
+            "- Address: register/offset/node id for selected profile."
+        )
+        hint.setWordWrap(True)
+        hint.setObjectName("SubtleText")
+        layout.addWidget(hint)
+
+        self.cmb_binding_profile = QComboBox()
+        self.cmb_binding_profile.addItems(self.tag_manager.get_connection_names())
+        self.cmb_binding_profile.setCurrentText(self.tag_manager.get_active_connection_name())
+        layout.addWidget(self.cmb_binding_profile)
+
+        self.tbl_bindings = QTableWidget(0, 3)
+        self.tbl_bindings.setHorizontalHeaderLabels(["Tag", "Area", "Address"])
+        layout.addWidget(self.tbl_bindings)
+
+        btn_row = QHBoxLayout()
+        self.btn_binding_save = QPushButton("Save Tag Bindings")
+        self.btn_binding_save.setObjectName("PrimaryButton")
+        btn_row.addWidget(self.btn_binding_save)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        self.cmb_binding_profile.currentTextChanged.connect(self.load_tag_binding_table)
+        self.btn_binding_save.clicked.connect(self.save_tag_binding_tab)
+
+        self.load_tag_binding_table()
+        self._apply_engineering_lock([self.cmb_binding_profile, self.tbl_bindings, self.btn_binding_save])
+
+    def load_tag_binding_table(self, profile_name: str = ""):
+        profile = profile_name or self.cmb_binding_profile.currentText()
+        bindings = self.tag_manager.get_bindings_for_profile(profile)
+        catalog = self.tag_manager.get_all_tag_dicts()
+
+        self.tbl_bindings.setRowCount(0)
+        for tag in catalog:
+            tag_name = str(tag.get("name", "")).strip()
+            if not tag_name:
+                continue
+
+            binding = bindings.get(tag_name, {})
+            row = self.tbl_bindings.rowCount()
+            self.tbl_bindings.insertRow(row)
+            self.tbl_bindings.setItem(row, 0, QTableWidgetItem(tag_name))
+
+            cmb_area = QComboBox()
+            cmb_area.setEditable(True)
+            cmb_area.addItems(self.TAG_AREA_OPTIONS)
+            cmb_area.setCurrentText(str(binding.get("area", "")))
+            self.tbl_bindings.setCellWidget(row, 1, cmb_area)
+
+            self.tbl_bindings.setItem(row, 2, QTableWidgetItem(str(binding.get("address", ""))))
+
+    def save_tag_binding_tab(self):
+        if not self.engineering_edit_allowed:
+            QMessageBox.warning(self, "Locked", "Engineering edits are disabled.")
+            return
+
+        try:
+            profile = self.cmb_binding_profile.currentText()
+            bindings = {}
+            for row in range(self.tbl_bindings.rowCount()):
+                tag_name = self._table_text(self.tbl_bindings, row, 0)
+                if not tag_name:
+                    continue
+                address_text = self._table_text(self.tbl_bindings, row, 2)
+                bindings[tag_name] = {
+                    "area": self._combo_value(self.tbl_bindings, row, 1, ""),
+                    "address": self._parse_address(address_text),
+                }
+
+            self.tag_manager.set_bindings_for_profile(profile, bindings)
+            self.tag_manager.save()
+            self.config_saved.emit("tag_bindings")
+            QMessageBox.information(self, "Saved", f"Tag bindings saved for profile: {profile}")
         except Exception as exc:
             QMessageBox.critical(self, "Save Error", str(exc))
 
@@ -836,31 +928,33 @@ class SettingsScreen(QWidget):
             "   - Host: PLC IP or OPC UA endpoint.\n"
             "   - Port: communication port.\n"
             "   - Poll ms: tag scan time.\n\n"
-            "2. Tags\n"
+            "2. Tag Catalog\n"
             "   - Name: logical tag used by app screens.\n"
             "   - Group: use status/manual/command/alarm/io/recipe.\n"
-            "   - Area: PLC memory type.\n"
-            "   - Address: PLC register/coil/db offset.\n"
             "   - Data Type: bool, uint16, int16, float, etc.\n"
             "   - Access: r / w / rw.\n"
             "   - Default: startup value.\n"
             "   - Scale: numeric scaling factor.\n\n"
-            "3. Alarm Mapping\n"
+            "3. Tag Binding\n"
+            "   - Select connection profile first.\n"
+            "   - Set Area and Address per tag for that profile.\n"
+            "   - New tags/profiles auto-create empty binding rows.\n\n"
+            "4. Alarm Mapping\n"
             "   - Alarm Tag must be a valid word/register tag.\n"
             "   - Bit No is the bit index inside that word.\n"
             "   - Alarm Text is shown in banner/history.\n"
             "   - Severity supports critical, warning, info.\n\n"
-            "4. Manual Devices\n"
+            "5. Manual Devices\n"
             "   - Key: internal unique id such as M1, M2, M3, SLIDE.\n"
             "   - Title: text shown on manual screen.\n"
             "   - Fwd/Rev Cmd: command tags written by the app.\n"
             "   - Running/Fwd Done/Rev Done: feedback tags from PLC.\n"
             "   - Interlock Word: PLC word/register containing interlock bits.\n"
             "   - Interlock table: define each bit, text, and severity.\n\n"
-            "5. Backup\n"
+            "6. Backup\n"
             "   - Export Config Backup saves the full engineering configuration.\n"
             "   - Import Config Backup loads a previously saved backup and reloads the app live.\n\n"
-            "6. Production Lock Mode\n"
+            "7. Production Lock Mode\n"
             "   - When ON, engineering edits are disabled.\n"
             "   - Runtime actions such as profile selection can still remain available.\n"
             "   - Simulator usage can also be disabled by role/lock settings.\n"
@@ -930,6 +1024,15 @@ class SettingsScreen(QWidget):
         try:
             if "." in v:
                 return float(v)
+            return int(v)
+        except Exception:
+            return v
+
+    def _parse_address(self, value: str):
+        v = value.strip()
+        if v == "":
+            return ""
+        try:
             return int(v)
         except Exception:
             return v
