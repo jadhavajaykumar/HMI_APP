@@ -1,0 +1,259 @@
+{
+  "active_connection": "siemens_opcua_line1",
+  "connections": {
+    "simulator_local": {
+      "driver": "simulator",
+      "host": "127.0.0.1",
+      "port": 0,
+      "poll_ms": 250
+    },
+    "keyence_modbus": {
+      "driver": "modbus",
+      "host": "192.168.0.10",
+      "port": 502,
+      "slave_id": 1,
+      "poll_ms": 250
+    },
+    "siemens_s7_line1": {
+      "driver": "siemens_s7",
+      "host": "192.168.0.20",
+      "poll_ms": 250,
+      "siemens": {
+        "rack": 0,
+        "slot": 1,
+        "db_number": 100
+      }
+    },
+    "siemens_opcua_line1": {
+      "driver": "opcua",
+      "endpoint": "opc.tcp://192.168.0.30:4840",
+      "username": "",
+      "password": "",
+      "poll_ms": 500
+    }
+  },
+  "tag_catalog": [
+    {
+      "name": "Machine.RunStatus",
+      "group": "status",
+      "data_type": "uint16",
+      "access": "r",
+      "scale": 1.0,
+      "default": 0
+    },
+    {
+      "name": "Machine.FaultCode",
+      "group": "status",
+      "data_type": "uint16",
+      "access": "r",
+      "scale": 1.0,
+      "default": 0
+    },
+    {
+      "name": "Counters.GoodCount",
+      "group": "status",
+      "data_type": "uint16",
+      "access": "r",
+      "scale": 1.0,
+      "default": 0
+    },
+    {
+      "name": "Recipe.TargetQty",
+      "group": "recipe",
+      "data_type": "uint16",
+      "access": "rw",
+      "scale": 1.0,
+      "default": 50
+    },
+    {
+      "name": "Input.DoorClosed",
+      "group": "io",
+      "data_type": "bool",
+      "access": "r",
+      "scale": 1.0,
+      "default": true
+    },
+    {
+      "name": "Command.Start",
+      "group": "command",
+      "data_type": "bool",
+      "access": "w",
+      "scale": 1.0,
+      "default": false
+    },
+    {
+      "name": "Command.Stop",
+      "group": "command",
+      "data_type": "bool",
+      "access": "w",
+      "scale": 1.0,
+      "default": false
+    },
+    {
+      "name": "Command.Reset",
+      "group": "command",
+      "data_type": "bool",
+      "access": "w",
+      "scale": 1.0,
+      "default": false
+    },
+    {
+      "name": "Command.ManStepMtrForward",
+      "group": "command",
+      "data_type": "bool",
+      "access": "w",
+      "scale": 1.0,
+      "default": false
+    },
+    {
+      "name": "Command.ManStepMtr1Reverse",
+      "group": "command",
+      "data_type": "bool",
+      "access": "w",
+      "scale": 1.0,
+      "default": false
+    }
+  ],
+  "tag_bindings": {
+    "keyence_modbus": {
+      "Machine.RunStatus": {
+        "area": "holding_register",
+        "address": 0
+      },
+      "Machine.FaultCode": {
+        "area": "holding_register",
+        "address": 1
+      },
+      "Counters.GoodCount": {
+        "area": "holding_register",
+        "address": 10
+      },
+      "Recipe.TargetQty": {
+        "area": "holding_register",
+        "address": 100
+      },
+      "Input.DoorClosed": {
+        "area": "coil",
+        "address": 101
+      },
+      "Command.Start": {
+        "area": "coil",
+        "address": 0
+      },
+      "Command.Stop": {
+        "area": "coil",
+        "address": 1
+      },
+      "Command.Reset": {
+        "area": "coil",
+        "address": 2
+      },
+      "Command.ManStepMtrForward": {
+        "area": "coil",
+        "address": 3
+      },
+      "Command.ManStepMtr1Reverse": {
+        "area": "coil",
+        "address": 4
+      }
+    },
+    "siemens_s7_line1": {
+      "Machine.RunStatus": {
+        "area": "dbw",
+        "address": 20
+      },
+      "Machine.FaultCode": {
+        "area": "dbw",
+        "address": 22
+      },
+      "Counters.GoodCount": {
+        "area": "dbw",
+        "address": 24
+      },
+      "Recipe.TargetQty": {
+        "area": "dbw",
+        "address": 100
+      },
+      "Input.DoorClosed": {
+        "area": "dbx",
+        "address": 1010
+      },
+      "Command.Start": {
+        "area": "dbx",
+        "address": 0
+      },
+      "Command.Stop": {
+        "area": "dbx",
+        "address": 1
+      },
+      "Command.Reset": {
+        "area": "dbx",
+        "address": 2
+      },
+      "Command.ManStepMtrForward": {
+        "area": "dbx",
+        "address": 3
+      },
+      "Command.ManStepMtr1Reverse": {
+        "area": "dbx",
+        "address": 4
+      }
+    },
+    "siemens_opcua_line1": {
+      "Machine.RunStatus": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"Machine_RunStatus\""
+      },
+      "Machine.FaultCode": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"Machine_FaultCode\""
+      },
+      "Counters.GoodCount": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"GoodCount\""
+      },
+      "Recipe.TargetQty": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"TargetQty\""
+      },
+      "Input.DoorClosed": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"DoorClosed\""
+      },
+      "Command.Start": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"StartCmd\""
+      },
+      "Command.Stop": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"StopCmd\""
+      },
+      "Command.Reset": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"ResetCmd\""
+      },
+      "Command.ManStepMtrForward": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"ManStepMtrForward\""
+      },
+      "Command.ManStepMtr1Reverse": {
+        "area": "opcua_node",
+        "address": "ns=3;s=\"HMI_DB\".\"ManStepMtr1Reverse\""
+      }
+    }
+  },
+  "manual_devices": [
+    {
+      "key": "M1",
+      "title": "Stepper Motor 1",
+      "fwd_cmd": "Command.ManStepMtrForward",
+      "rev_cmd": "Command.ManStepMtr1Reverse",
+      "running_fb": "",
+      "fwd_done_fb": "",
+      "rev_done_fb": "",
+      "interlock_word": "",
+      "interlocks": {}
+    }
+  ],
+  "alarm_words": []
+}

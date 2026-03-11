@@ -1,0 +1,29 @@
+{
+  "app_name": "KV-X520 / Siemens PC HMI",
+  "company": "PCS Controls",
+  "theme": "dark",
+  "login_required": true,
+  "engineering_mode": true,
+  "production_lock_mode": false,
+  "audit_log_enabled": true,
+  "role_permissions": {
+    "admin": {
+      "screens": ["Home", "Manual", "I/O", "Alarms", "Simulator", "Settings"],
+      "manual_actions": true,
+      "engineering_edit": true,
+      "simulator_use": true
+    },
+    "maintenance": {
+      "screens": ["Home", "Manual", "I/O", "Alarms", "Settings"],
+      "manual_actions": true,
+      "engineering_edit": false,
+      "simulator_use": false
+    },
+    "operator": {
+      "screens": ["Home", "Manual", "Alarms"],
+      "manual_actions": false,
+      "engineering_edit": false,
+      "simulator_use": false
+    }
+  }
+}
