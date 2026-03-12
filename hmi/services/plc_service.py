@@ -21,7 +21,13 @@ class PlcService(QObject):
         self.timer = QTimer()
         self.timer.timeout.connect(self.poll_all)
         self.poll_ms = self.tag_manager.connection_config.get("poll_ms", 250)
-
+    
+    def _format_error(self, exc: Exception) -> str:
+        message = str(exc).strip()
+        if message:
+            return message
+        return f"{type(exc).__name__}: no additional details"
+        
     def _build_driver(self):
         cfg = self.tag_manager.connection_config
         driver_name = str(cfg.get("driver", "simulator")).lower()
@@ -105,7 +111,7 @@ class PlcService(QObject):
                 self.timer.start(self.poll_ms)
         except Exception as exc:
             self.logger.exception("PLC start/connect failed")
-            self.error_occurred.emit(str(exc))
+            self.error_occurred.emit(self._format_error(exc))
             self.connection_changed.emit(False)
 
     def stop(self):
@@ -150,7 +156,12 @@ class PlcService(QObject):
 
         except Exception as exc:
             self.logger.exception("PLC poll failed")
-            self.error_occurred.emit(str(exc))
+            self.timer.stop()
+            try:
+                self.driver.disconnect()
+            except Exception:
+                pass
+            self.error_occurred.emit(self._format_error(exc))
             self.connection_changed.emit(False)
 
     def read_tag(self, tag_name: str):
@@ -166,7 +177,7 @@ class PlcService(QObject):
             return ok
         except Exception as exc:
             self.logger.exception("PLC write failed for tag='%s'", tag_name)
-            self.error_occurred.emit(str(exc))
+            self.error_occurred.emit(self._format_error(exc))
             return False
 
     def pulse_coil(self, tag_name: str, duration_ms: int = 200):

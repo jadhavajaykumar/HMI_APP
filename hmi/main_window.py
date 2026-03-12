@@ -222,7 +222,8 @@ class MainWindow(QMainWindow):
         self.header.set_connection_state(connected)
 
     def on_error(self, message: str):
-        QMessageBox.warning(self, "PLC Communication Error", message)
+        text = str(message).strip() or "Unknown PLC communication error."
+        QMessageBox.warning(self, "PLC Communication Error", text)
 
     def on_alarm_count_changed(self, count: int):
         self.alarm_banner.set_alarm_state(

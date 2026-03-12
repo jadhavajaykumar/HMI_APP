@@ -22,6 +22,7 @@ class OpcUaDriver(BasePlcDriver):
         self.security_string = security_string
         self.client = Client(self.endpoint)
         self._connected = False
+        self._bad_nodes_logged: set[str] = set()
         
         if self.security_string:
             self.client.set_security_string(self.security_string)
@@ -41,6 +42,7 @@ class OpcUaDriver(BasePlcDriver):
         try:
             self.client.connect()
             self._connected = True
+            self._bad_nodes_logged.clear()
             self.logger.info("OPC UA session established")
             return True
         except Exception:
@@ -55,6 +57,7 @@ class OpcUaDriver(BasePlcDriver):
         if self._connected:
             self.client.disconnect()
         self._connected = False
+        self._bad_nodes_logged.clear()
 
     def is_connected(self) -> bool:
         return self._connected
@@ -71,8 +74,14 @@ class OpcUaDriver(BasePlcDriver):
                 node = self.client.get_node(node_id)
                 out[tag.name] = node.read_value()
             except Exception:
-                self.logger.exception("OPC UA read failed tag='%s' node='%s'", tag.name, node_id)
-                raise
+                if node_id not in self._bad_nodes_logged:
+                    self._bad_nodes_logged.add(node_id)
+                    self.logger.exception(
+                        "OPC UA read failed tag='%s' node='%s' (value set to None)",
+                        tag.name,
+                        node_id,
+                    )
+                out[tag.name] = None
         return out
 
     def write_tag(self, tag: TagDefinition, value: Any) -> bool:
