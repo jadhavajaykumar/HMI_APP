@@ -27,7 +27,10 @@ class TagManager:
 
     def _load(self) -> None:
         self.raw_data = json.loads(self.config_path.read_text(encoding="utf-8"))
+        self._sync_from_raw_data()
+        self._rebuild_tag_runtime()
 
+    def _sync_from_raw_data(self) -> None:
         self.connections = self.raw_data.get("connections", {})
         self.active_connection_name = self.raw_data.get("active_connection", "")
         if not self.active_connection_name and self.connections:
@@ -45,7 +48,8 @@ class TagManager:
             
         self.tag_bindings = self.raw_data.get("tag_bindings", {})
         self.ensure_binding_matrix()
-
+        
+    def _rebuild_tag_runtime(self) -> None:    
         active_binding = self.tag_bindings.get(self.active_connection_name, {})
 
         old_values = {
@@ -119,7 +123,8 @@ class TagManager:
             "tag_bindings": config_data.get("tag_bindings", {}),
         }
 
-        self._load()
+        self._sync_from_raw_data()
+        self._rebuild_tag_runtime()
 
     def generate_validation_report(self) -> list[str]:
         issues = []
@@ -202,7 +207,7 @@ class TagManager:
         
         self.raw_data["tag_catalog"] = self.tag_catalog
         self.raw_data["tag_bindings"] = self.tag_bindings
-        self._load()
+        self._rebuild_tag_runtime()
 
     def get_connection_names(self) -> List[str]:
         return list(self.connections.keys())
@@ -213,7 +218,7 @@ class TagManager:
         self.active_connection_name = connection_name
         self.connection_config = self.connections[connection_name]
         self.raw_data["active_connection"] = connection_name
-        self._load()
+        self._rebuild_tag_runtime()
 
     def get_active_connection_name(self) -> str:
         return self.active_connection_name

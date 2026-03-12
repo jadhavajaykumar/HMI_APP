@@ -518,7 +518,11 @@ class SettingsScreen(QWidget):
             "Tag Binding fields (for selected profile):\n"
             "- Tag: logical name from catalog.\n"
             "- Area: driver-specific memory area / node type.\n"
-            "- Address: register/offset/node id for selected profile."
+            "- Address: register/offset/node id for selected profile.\n"
+            "- This table is user-definable and should match your PLC/OPC program map.\n"
+            "- Modbus: coil/holding_register/input_register/discrete_input + numeric address.\n"
+            "- Siemens S7: dbw byte-offset, dbx encoded as byte*100+bit (1203 => DBX12.3).\n"
+            "- OPC UA: opcua_node + full NodeId string (ns=...;s=...)."
         )
         hint.setWordWrap(True)
         hint.setObjectName("SubtleText")
@@ -969,6 +973,10 @@ class SettingsScreen(QWidget):
             "3. Tag Binding\n"
             "   - Select connection profile first.\n"
             "   - Set Area and Address per tag for that profile.\n"
+            "   - These are user-defined mappings; use them to match your PLC program.\n"
+            "   - Modbus areas: coil, holding_register, input_register, discrete_input.\n"
+            "   - Siemens S7 areas: dbw (word byte offset), dbx (byte*100+bit encoding).\n"
+            "   - OPC UA area: opcua_node (full NodeId like ns=3;s=\"DB\".\"Tag\").\n"
             "   - New tags/profiles auto-create empty binding rows.\n\n"
             "4. Alarm Mapping\n"
             "   - Alarm Tag must be a valid word/register tag.\n"

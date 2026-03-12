@@ -1,5 +1,5 @@
 {
-  "active_connection": "siemens_opcua_line1",
+  "active_connection": "keyence_modbus",
   "connections": {
     "simulator_local": {
       "driver": "simulator",
